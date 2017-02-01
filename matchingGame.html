@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html>
+<style>
+table.grid {
+	border-collapse: collapse;
+	table-layout: fixed;
+
+} 
+table.grid, td.grid {
+  border-style: solid;
+}
+
+td.grid {
+	width: 200px;
+	height: 160px;
+	border-style: solid;
+}
+
+td.finished {
+	width: 200px;
+	height: 160px;
+	background-color: grey;
+	border-style: solid;
+}
+
+p, td {
+	text-align: center; 
+	font: 50px arial, sans-serif;
+}
+
+</style>
+<body>
+<h1>Memory Game</h1>
+<table id="table" class="grid"></table>
+<br>
+<input  type="button" id="reset" value="reset" onclick="refreshGame()"/>
+<br>
+<table>
+<tr><td>row count</td><td><input type="number" id="rowCount" value="3"/></td></tr>
+<tr><td>col count</td><td><input type="number" id="colCount" value="4"/></td></tr>
+</table>
+
+<script>
+"use strict"; 
+
+var topOfRange;
+var itemValues=[];
+var rowCount;
+var colCount;
+var pairs=[];
+
+refreshGame();
+
+function refreshGame() {
+	rowCount=parseInt(document.getElementById("rowCount").value);
+	colCount=parseInt(document.getElementById("colCount").value);
+
+	if (colCount%2 ==1  && rowCount%2 == 1) {
+		colCount = colCount + 1;
+	}
+
+
+	//clean up screen
+	var htmlString="";
+	for (var i=0; i< rowCount; i++) {
+		htmlString += "<tr>";
+		for (var j=0; j < colCount; j++) {
+			var countId=j + i * colCount;
+			htmlString+="<td class=\"grid\" id=\"data" + countId + "\" onclick=\"twist(" + countId + ")\"><p></p></td>"
+		}
+		htmlString += "</tr>";
+	}
+	document.getElementById("table").innerHTML = htmlString;
+	
+	pairs.splice(0,pairs.length);	//empty array
+	itemValues.splice(0,itemValues.length);	//empty array
+	refreshPairs();
+	refreshGrid();
+}
+
+function refreshPairs() {
+	var notes=[["a.png", "a"], ["c.png","c"], ["d.png","d"], ["f.png","f"], ["g.png","g"]];
+	for (var i=0; i< (rowCount * colCount) /2; i++) {
+		var targetEntry = getNumberInRange(0,notes.length);
+
+		var contents = new FieldContents(0);
+		pairs.push(contents);
+		contents.image=notes[targetEntry][0];
+		contents.text = notes[targetEntry][1];
+	
+		
+		var contents = new FieldContents(0);
+		pairs.push(contents);
+		contents.text = notes[targetEntry][1];
+		
+		
+	}
+	
+	//sort by the random shuffle id
+	pairs.sort(function(a,b){return a.shuffleId-b.shuffleId;});
+
+}
+
+
+
+function refreshGrid() {
+
+	var rowTotals=[];
+	
+	for (var i=0; i < rowCount; i++){
+		rowTotals.push(getNumberInRange(0,topOfRange));
+	}
+	
+	populateTotal(rowTotals, itemValues);
+	
+	for (i=0; i<rowCount * colCount; i++) {
+		itemValues[i].putAt();
+	}
+	
+}
+
+function xpopulateTotal(rowTotals, itemValues) {
+	for (var i=0; i< rowCount; i++) {
+		for (var j=0; j< colCount; j++) {
+			var contents = new FieldContents(i*colCount + j);
+			
+			var firstNum=getNumberInRange(0, rowTotals[i])
+			var secondNum=rowTotals[i] - firstNum;
+			contents.text = firstNum + " + " + secondNum;
+			itemValues[i*colCount + j] = contents;
+		}
+	}
+}
+
+
+function populateTotal(rowTotals, itemValues) {
+	for (var i=0; i< rowCount * colCount; i++) {
+		itemValues[i] = pairs[i];
+		itemValues[i].fieldNum = i;
+	}
+}
+
+
+function getNumberInRange(min, max) {
+	return Math.round(Math.random() * (max - min) ,0) + min;
+}
+
+
+function twist(fieldId) {
+		var returnArray = doForEachElement(function(returnArray, z) {
+			if (!itemValues[z].finished){
+				returnArray.push(itemValues[z])
+			}
+			});
+		if (returnArray.length == 1) {
+			//see if its the same
+			if (returnArray[0].equals(itemValues[fieldId]) && 
+				returnArray[0].fieldNum != itemValues[fieldId].fieldNum) {
+				returnArray[0].makeFinished(fieldId);
+				itemValues[fieldId].makeFinished(fieldId);
+				
+			}
+		} else if (returnArray.length > 1) {
+			doForEachElement(function (returnArray,z) {
+				itemValues[z].covered=true;
+				itemValues[z].putAt(z);		
+			});
+		
+		}
+
+		itemValues[fieldId].covered = itemValues[fieldId].covered?false:true;
+		itemValues[fieldId].putAt(fieldId);		
+		
+}
+
+
+function doForEachElement(actionFunction) {
+	var returnArray = [];
+	for (var i=0; i< rowCount; i++) {
+		for (var j=0; j< colCount; j++) {
+			if (itemValues[i*colCount + j].covered == false) {
+				actionFunction(returnArray, i*colCount + j);
+			}
+		}
+	}
+
+	return returnArray;
+}
+
+
+function FieldContents(fieldNum) {
+	this.fieldNum=fieldNum;
+	this.shuffleId=getNumberInRange(0,100);
+	this.text = "";
+	this.image = "";
+	this.covered =  true;
+	this.finished = false;
+	this.putAt = function () {
+		var fieldId="data" + this.fieldNum;
+		if (this.covered && !this.finished) {
+			document.getElementById(fieldId).innerHTML = "<img src=\"greenMandelbrot.png\"/>";
+		} else {
+			if (this.image == "") {
+				document.getElementById(fieldId).innerHTML = "<p>" + this.text + "<\p>";
+			} else {
+				document.getElementById(fieldId).innerHTML = "<img src=\"" + this.image + "\"/>";
+			}
+			
+		}		
+	};
+	
+	this.makeFinished = function() {
+		var fieldId = "data" + this.fieldNum;
+		this.finished = true;
+		document.getElementById(fieldId).className = "finished";
+	};
+	this.equals = function (that) {
+		return (this.text == that.text && this.image != that.image);
+	};
+}
+
+
+	
+</script>
+
+</body>
+</html>
